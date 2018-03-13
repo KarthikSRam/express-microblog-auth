@@ -34,6 +34,17 @@
     </div>
   </div>
 
+  <div class="container">
+    <% if(!user) { %>
+      <a href="/login">Log in</a>
+      <a href="/signup">Sign up</a>
+      <% } else { %>
+        <div>Welcome, <%= user.username %>!</div>
+        <a href="/logout">Log out</a>
+        <% } %>
+        <hr>
+  </div>
+
   <!-- page content -->
   <div class="container">
     <div class="row">

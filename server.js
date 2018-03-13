@@ -3,9 +3,15 @@ var express = require("express"),
   app = express(),
   bodyParser = require("body-parser"),
   methodOverride = require("method-override");
+
+  var cookieParser = require('cookie-parser'),
+  session = require('express-session'),
+  passport = require('passport'),
+  LocalStrategy = require('passport-local').Strategy;
 // require Post model
 var db = require("./models"),
   Post = db.Post;
+  User = db.User;
 
 // configure bodyParser (for receiving form data)
 app.use(bodyParser.urlencoded({ extended: true, }));
@@ -18,6 +24,21 @@ app.set("view engine", "ejs");
 
 app.use(methodOverride("_method"));
 
+// middleware for auth
+app.use(cookieParser());
+app.use(session({
+  secret: 'ajithkumar', // change this!
+  resave: false,
+  saveUninitialized: false
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+// passport config
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
 
 // HOMEPAGE ROUTE
 
@@ -26,7 +47,7 @@ app.get("/", function (req, res) {
     if (err) {
       res.status(500).json({ error: err.message, });
     } else {
-      res.render("index", { posts: allPosts, });
+      res.render("index", { posts: allPosts, user: req.user });
     }
   });
 });
@@ -42,6 +63,12 @@ app.get("/posts/:id", function(req, res) {
 });
 
 app.post("/posts", function(req, res) {
+
+  if(!req.user){
+    console.log("Post fail");
+    return res.json({error: "Not logged in! Cannot create a post."});
+  }
+  console.log("Post success");
   var newPost = new Post(req.body);
 
   // save new post in db
@@ -109,9 +136,14 @@ app.get("/api/posts", function (req, res) {
 
 // create new post
 app.post("/api/posts", function (req, res) {
+  if(!req.user){
+    console.log("Post fail");
+    res.json({error: "Not logged in! Cannot create a post."});
+  }
   // create new post with form data (`req.body`)
   var newPost = new Post(req.body);
 
+  console.log("Post success");
   // save new post in db
   newPost.save(function (err, savedPost) {
     if (err) {
@@ -182,6 +214,40 @@ app.delete("/api/posts/:id", function (req, res) {
   });
 });
 
+app.get('/signup', function(req, res) {
+  res.render('signup');
+})
+
+// sign up new user, then log them in
+// hashes and salts password, saves new user to db
+app.post('/signup', function (req, res) {
+  User.register(new User({ username: req.body.username }), req.body.password,
+    function (err, newUser) {
+      passport.authenticate('local')(req, res, function() {
+        //res.send('signed up!!!');
+        res.redirect("/");
+      });
+    }
+  );
+});
+
+app.get('/login', function (req, res) {
+ res.render('login');
+});
+
+app.post('/login', passport.authenticate('local'), function (req, res) {
+  console.log(req.user);
+  // res.json({"logged in as": req.user});
+  // res.send('logged in!!!'); // sanity check
+   res.redirect('/'); // preferred!
+});
+
+app.get('/logout', function (req, res) {
+  console.log("BEFORE logout", JSON.stringify(req.user));
+  req.logout();
+  console.log("AFTER logout", JSON.stringify(req.user));
+  res.redirect('/');
+});
 
 // listen on port 3000
 app.listen(3000, function() {
